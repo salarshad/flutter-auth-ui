@@ -494,7 +494,7 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
                         height: 16,
                         width: 16,
                         child: CircularProgressIndicator(
-                          color: Theme.of(context).colorScheme.surface,
+                          color: Theme.of(context).colorScheme.primary,
                           strokeWidth: 1.5,
                         ),
                       )
@@ -559,6 +559,9 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
     setState(() {
       _isLoading = true;
     });
+
+    await Future.delayed(Duration(milliseconds: 50));
+
     try {
       if (_isSigningIn) {
         final response = await supabase.auth.signInWithPassword(
@@ -605,11 +608,12 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
         widget.onError?.call(error);
       }
       _emailFocusNode.requestFocus();
-    }
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
