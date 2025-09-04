@@ -179,7 +179,7 @@ class SupaEmailAuth extends StatefulWidget {
   final String? Function(String?)? passwordValidator;
 
   /// Callback for the user to complete a sign in.
-  final void Function(AuthResponse response) onSignInComplete;
+  final void Function(AuthResponse response, String email) onSignInComplete;
 
   /// Callback for the user to complete a signUp.
   ///
@@ -217,12 +217,15 @@ class SupaEmailAuth extends StatefulWidget {
   final Widget? prefixIconEmail;
   final Widget? prefixIconPassword;
 
+  final String? initialEmail;
+
   /// Whether the confirm password field should be displayed
   final bool showConfirmPasswordField;
 
   /// {@macro supa_email_auth}
   const SupaEmailAuth({
     super.key,
+    this.initialEmail = "",
     this.autofocus = true,
     this.redirectTo,
     this.resetPasswordRedirectTo,
@@ -248,7 +251,7 @@ class SupaEmailAuth extends StatefulWidget {
 
 class _SupaEmailAuthState extends State<SupaEmailAuth> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  late final TextEditingController _emailController;
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   late bool _isSigningIn;
@@ -261,10 +264,12 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
 
   /// Focus node for email field
   final FocusNode _emailFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
     _isSigningIn = widget.isInitiallySigningIn;
     _metadataControllers = Map.fromEntries((widget.metadataFields ?? []).map(
       (metadataField) => MapEntry(
@@ -274,6 +279,24 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
             : TextEditingController(),
       ),
     ));
+
+    // Request focus on password field if email is pre-filled and not recovering password
+    if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty && !_isRecoveringPassword) {
+      // It's important to request focus after the first frame has been built.
+      // WidgetsBinding.instance.addPostFrameCallback ensures that.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          FocusScope.of(context).requestFocus(_passwordFocusNode);
+        }
+      });
+    } else if (widget.autofocus && !_isRecoveringPassword) {
+      // Default autofocus behavior if no initial email or recovering password
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          FocusScope.of(context).requestFocus(_emailFocusNode);
+        }
+      });
+    }
   }
 
   @override
@@ -281,6 +304,8 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     for (final controller in _metadataControllers.values) {
       if (controller is TextEditingController) {
         controller.dispose();
@@ -333,6 +358,7 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
                     ? [AutofillHints.password]
                     : [AutofillHints.newPassword],
                 autovalidateMode: AutovalidateMode.onUserInteraction,
+                focusNode: _passwordFocusNode,
                 textInputAction: widget.metadataFields != null && !_isSigningIn
                     ? TextInputAction.next
                     : TextInputAction.done,
@@ -468,7 +494,7 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
                         height: 16,
                         width: 16,
                         child: CircularProgressIndicator(
-                          color: Theme.of(context).colorScheme.onPrimary,
+                          color: Theme.of(context).colorScheme.surface,
                           strokeWidth: 1.5,
                         ),
                       )
@@ -539,7 +565,7 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-        widget.onSignInComplete.call(response);
+        widget.onSignInComplete.call(response, _emailController.text.trim());
       } else {
         final user = supabase.auth.currentUser;
         late final AuthResponse response;
@@ -607,9 +633,7 @@ class _SupaEmailAuthState extends State<SupaEmailAuth> {
       // FIX use_build_context_synchronously
       if (!mounted) return;
       context.showSnackBar(widget.localization.passwordResetSent);
-      setState(() {
-        _isRecoveringPassword = false;
-      });
+      
     } on AuthException catch (error) {
       widget.onError?.call(error);
     } catch (error) {
