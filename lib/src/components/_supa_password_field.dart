@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 /// Internal password field component with visibility toggle
 class SupaPasswordField extends StatefulWidget {
+
+  final FocusNode? focusNode;
+
   /// Controller for the password field
   final TextEditingController controller;
 
@@ -36,6 +39,7 @@ class SupaPasswordField extends StatefulWidget {
     this.textInputAction,
     this.onFieldSubmitted,
     this.autovalidateMode,
+    this.focusNode,
   });
 
   @override
@@ -48,6 +52,7 @@ class _SupaPasswordFieldState extends State<SupaPasswordField> {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      focusNode: widget.focusNode,
       controller: widget.controller,
       validator: widget.validator,
       obscureText: _obscureText,
